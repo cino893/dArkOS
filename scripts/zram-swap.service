@@ -1,0 +1,19 @@
+[Unit]
+Description=Compressed in-RAM swap (zram0)
+After=local-fs.target
+# Swap has to exist before the first game can be launched, and stopping after
+# EmulationStation means its pages are already freed by the time swapoff runs.
+Before=emulationstation.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/zram-swap.sh start
+ExecStop=/usr/local/bin/zram-swap.sh stop
+# swapoff faults every swapped page back into RAM, which is slow on a full zram.
+# systemd swaps off again in its final shutdown phase, after everything is killed
+# and the pages are free, so nothing is lost by giving up early here.
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
