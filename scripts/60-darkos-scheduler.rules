@@ -1,0 +1,9 @@
+# RK3326 only.  Both 4.4 defconfigs build with CONFIG_DEFAULT_IOSCHED="cfq", so
+# every block device comes up on CFQ, whose slice_idle is pure added latency on
+# SD/eMMC.  deadline is compiled in (CONFIG_IOSCHED_DEADLINE=y); bfq does not
+# exist in 4.4.  NOT installed on RK3566: 10-standard.rules already selects bfq
+# there and this file, sorting later, would override it.
+# The 60- prefix is what puts it after 10-standard.rules - udev(7), RULES FILES:
+# "All rules files are collectively sorted and processed in lexicographic order,
+# regardless of the directories in which they live."
+ACTION=="add|change", KERNEL=="sd[a-z]*|mmcblk[0-9]*", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="deadline"
