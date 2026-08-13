@@ -1,0 +1,439 @@
+dArkOS read-only diagnostics - mode: boot
+
+===============================================================
+1. What machine is this
+---------------------------------------------------------------
+date        : Thu Aug 13 04:06:00 PM CEST 2026
+kernel      : Linux 4.4.189 aarch64
+model       : HL-R36H-V20 2024-05-18
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+VERSION_CODENAME=trixie
+soc / cpus  : RK3326 / 4
+uptime      : 7254.81 s since boot
+root device : mmcblk0p2
+
+-- sysfs nodes perfmax writes to (detected, not assumed)
+  cpufreq policies : /sys/devices/system/cpu/cpufreq/policy0
+  gpu devfreq      : /sys/devices/platform/ff400000.gpu/devfreq/ff400000.gpu
+  dmc devfreq      : /sys/devices/platform/dmc/devfreq/dmc
+  all devfreq      : /sys/class/devfreq/dmc /sys/class/devfreq/ff400000.gpu
+  thermal zones    : 2
+  block devices    : /sys/block/mmcblk0
+
+  EXPECTED / WHAT IT DECIDES:
+    Kernel 4.4.x  -> RK3326 (RG351*, R36S, RGB10, RK2020). Proposals 1, 3, 4
+                     apply to this device.
+    Kernel 5.10.x -> RK3566 (RG353*, RG503, RGB30, RK2023). Only proposals
+                     2, 5, 6, 7 apply.
+    NOT FOUND next to a devfreq node means perfmax cannot have set it on this
+    unit at all, whatever the script says.
+
+===============================================================
+2. Q1 - is the remount of / actually failing? (decides proposal 4)
+---------------------------------------------------------------
+
+-- effective mount options of / (findmnt)
+/dev/mmcblk0p2 btrfs rw,noatime,compress=lzo,ssd,noacl,space_cache,subvolid=5,subvol=/
+
+-- effective mount options of / (/proc/mounts, no tools involved)
+/dev/mmcblk0p2 / btrfs rw,noatime,compress=lzo,ssd,noacl,space_cache,subvolid=5,subvol=/ 0 0
+
+-- what /etc/fstab asks for
+LABEL=ROOTFS / btrfs defaults,noatime,compress=lzo,noatime 0 0
+LABEL=BOOT /boot vfat defaults 0 2
+LABEL=EASYROMS /roms exfat defaults,auto,umask=000,uid=1000,gid=1000,noatime 0 0
+/roms/tools /opt/system/Tools none nofail,x-systemd.device-timeout=7,bind
+
+-- did systemd-remount-fs succeed?
+is-failed: active
+● systemd-remount-fs.service - Remount Root and Kernel File Systems
+     Loaded: loaded (/usr/lib/systemd/system/systemd-remount-fs.service; enabled-runtime; preset: enabled)
+     Active: active (exited) since Thu 2026-08-13 14:59:13 CEST; 1h 6min ago
+ Invocation: 0187cf9456314d0e89db11e5285034c0
+       Docs: man:systemd-remount-fs.service(8)
+             https://systemd.io/API_FILE_SYSTEMS
+   Main PID: 19383 (code=exited, status=0/SUCCESS)
+
+-- btrfs complaints in the kernel log
+[    2.971744] Btrfs loaded
+[    4.611495] BTRFS: device label ROOTFS devid 1 transid 2181 /dev/mmcblk0p2
+[    4.894986] BTRFS info (device mmcblk0p2): disk space caching is enabled
+[    4.895007] BTRFS: has skinny extents
+[    4.912307] BTRFS: detected SSD devices, enabling SSD mode
+[    6.521441] systemd[1]: Starting systemd-remount-fs.service - Remount Root and Kernel File Systems...
+[    6.694558] systemd[1]: systemd-remount-fs.service: Main process exited, code=exited, status=1/FAILURE
+[    6.695107] systemd[1]: systemd-remount-fs.service: Failed with result 'exit-code'.
+[    6.695663] systemd[1]: Failed to start systemd-remount-fs.service - Remount Root and Kernel File Systems.
+[    7.095557] proc: unrecognized mount option "hidepid=invisible" or missing value
+[   13.142083] proc: unrecognized mount option "hidepid=invisible" or missing value
+[  234.082416] proc: unrecognized mount option "hidepid=invisible" or missing value
+[ 3247.318037] BTRFS info (device mmcblk0p2): setting 8 feature flag
+[ 3247.318059] BTRFS info (device mmcblk0p2): disk space caching is enabled
+
+-- btrfs space accounting (only meaningful if / really is btrfs)
+Data, single: total=4.41GiB, used=3.97GiB
+System, DUP: total=32.00MiB, used=16.00KiB
+Metadata, DUP: total=800.00MiB, used=89.94MiB
+GlobalReserve, single: total=32.00MiB, used=0.00B
+
+  EXPECTED / WHAT IT DECIDES:
+    On RK3326 (4.4), our claim is that "compress=zlib:1" is not parsable by
+    btrfs 4.4, so the WHOLE remount is rejected and noatime is lost with it.
+    
+    PROPOSAL 4 IS CORRECT if the options of / show "relatime" and NO
+      "compress=" token, and/or systemd-remount-fs is failed.
+    PROPOSAL 4 IS WRONG - revert it - if the options of / show
+      "noatime" AND "compress=zlib" (any form). Then the parser accepts it
+      and there was never a problem.
+    On RK3566 (5.10) compress=zstd:1 is valid syntax; seeing it here is normal.
+
+===============================================================
+3. Q2 - what is /boot/uInitrd really? (decides proposal 3)
+---------------------------------------------------------------
+
+-- size
+-rwxr-xr-x 1 root root 11594467 Jul 27 13:22 /boot/uInitrd
+
+-- U-Boot image header magic (first 4 bytes, expect 27 05 19 56)
+ 27 05 19 56
+
+-- payload magic (4 bytes after the 64-byte mkimage header)
+ 1f 8b 08 00
+
+-- what the kernel said about the initramfs
+[    1.436373] Trying to unpack rootfs image as initramfs...
+[    2.586501] Freeing initrd memory: 11320K
+
+  EXPECTED / WHAT IT DECIDES:
+    Payload magic decoder:
+      28 b5 2f fd = zstd  -> PROPOSAL 3 IS CORRECT on a 4.4 kernel. The kernel
+                            has no zstd decompressor, so this file is read off
+                            the SD card on every boot and then thrown away.
+      04 22 4d 18 = lz4   -> this is what the fix produces. Good.
+      1f 8b       = gzip  -> PROPOSAL 3 IS WRONG - revert it. The initrd works
+                            and is really used.
+      fd 37 7a 58 = xz,  42 5a 68 = bzip2,  5d 00 00 = lzma
+    
+    Corroboration: dmesg containing "Initramfs unpacking failed" confirms it;
+    dmesg showing a successful unpack refutes it.
+    Size matters too: tens of MB means MODULES=most and a slow read every boot.
+    
+    On RK3566 (5.10) zstd is supported and the initrd is genuinely used -
+    seeing zstd there is NOT a bug.
+
+===============================================================
+4. Q3 - what clock does the CPU run at after boot? (touches proposals 2, 3)
+---------------------------------------------------------------
+NOTE: only meaningful if run shortly after boot and BEFORE any game,
+      because the @reboot cron job runs perfnorm and switches to ondemand.
+seconds since boot: 7255.28
+
+-- /sys/devices/system/cpu/cpufreq/policy0
+/sys/devices/system/cpu/cpufreq/policy0/scaling_governor: ondemand
+/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq: 1512000
+/sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq: 1008000
+/sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq: 1512000
+/sys/devices/system/cpu/cpufreq/policy0/scaling_available_frequencies: 1008000 1200000 1248000 1296000 1512000 
+
+-- GPU and memory controller (devfreq) - also set by perfmax/perfnorm
+  dmc (dmc)                    governor dmc_ondemand       cur_freq 528000000
+  ff400000.gpu (gpu)           governor simple_ondemand    cur_freq 400000000
+
+  EXPECTED / WHAT IT DECIDES:
+    RGB10 / RK2020 boot with CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE, which pins
+    whatever frequency the bootloader left and scales nothing. The RG351* units
+    boot on performance instead.
+    
+    If scaling_cur_freq sits at the BOTTOM of scaling_available_frequencies
+    right after boot, then the whole boot and all ES navigation up to the first
+    game run at minimum clock, and that dwarfs the 1.5 s saved by proposal 2.
+    If it sits at the TOP, there is no problem here and the topic is closed.
+    Run this again ~30 s later: the governor should have become ondemand, because
+    the root crontab runs "perfnorm quiet" at every boot.
+    What the clock does DURING a game is a different question - use the game mode.
+
+===============================================================
+5. Q4 - I/O scheduler and read-ahead (decides proposals 1 and 6)
+---------------------------------------------------------------
+
+-- block devices
+NAME          SIZE TYPE MOUNTPOINT
+mmcblk0     116.5G disk 
+├─mmcblk0p1   100M part /boot
+├─mmcblk0p2  10.4G part /
+└─mmcblk0p3   106G part /roms
+zram0           0B disk 
+
+-- /sys/block/mmcblk0 <- holds /
+/sys/block/mmcblk0/queue/scheduler: noop [deadline] cfq 
+/sys/block/mmcblk0/queue/read_ahead_kb: 512
+/sys/block/mmcblk0/queue/rotational: 0
+/sys/block/mmcblk0/queue/nr_requests: 128
+
+-- did the udev rule file make it into the image?
+/etc/udev/rules.d/10-standard.rules: # Rules
+KERNEL=="mali0", GROUP="video", MODE="0660"
+KERNEL=="rga", GROUP="video", MODE="0660"
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness"
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+
+  EXPECTED / WHAT IT DECIDES:
+    RK3326 (4.4), BEFORE proposal 1: scheduler shows [cfq]. AFTER: [deadline].
+    RK3566 (5.10): the repo already ships a bfq rule. If scheduler shows
+      [mq-deadline] or [none] instead of [bfq], the bfq module is not loaded
+      and that existing rule has been silently doing nothing.
+    
+    read_ahead_kb: 128 is the kernel default and means proposal 6 has not been
+    applied to this image yet. 512 means it has.
+    
+    rotational must be 0, otherwise neither rule matches at all.
+    Whether any of this is felt DURING a game is answered by the game mode, not here.
+
+===============================================================
+6. Q5 - can "nice -n -19" work at all? (decides proposal 5)
+---------------------------------------------------------------
+NOTE: this mode only shows whether the LIMIT exists. Whether the emulator
+      really ends up at NI = -19 can only be seen with a game running -
+      that is what "bash darkos-diag.sh game" is for.
+
+-- emulator / ES processes and their nice level
+    PID  NI PRI COMMAND
+    733   0  19 emulationstatio
+    759   0  19 emulationstatio
+
+-- RLIMIT_NICE of those processes
+pid 733     emulationstatio      Max nice priority 0 0 
+pid 759     emulationstatio      Max nice priority 0 0 
+
+-- everything currently running at a negative nice level
+    PID  NI COMMAND
+      5 -20 kworker/0:0H
+     15 -20 kworker/1:0H
+     20 -20 kworker/2:0H
+     25 -20 kworker/3:0H
+     27 -20 netns
+     28 -20 perf
+     30 -20 writeback
+     31 -20 crypto
+     32 -20 bioset
+     33 -20 kblockd
+     35 -20 devfreq_wq
+     36 -20 cfg80211
+     38 -20 rpciod
+     41 -20 kvm_arch_timer
+     42 -20 kvm-irqfd-clean
+     58 -20 vmstat
+     60 -20 SquashFS read w
+     61 -20 nfsiod
+     62 -20 cifsiod
+     63 -20 xfsalloc
+     64 -20 xfs_mru_cache
+     97 -20 vcodec
+    101 -20 bioset
+    102 -20 bioset
+    103 -20 bioset
+    104 -20 bioset
+    105 -20 bioset
+    106 -20 bioset
+    107 -20 bioset
+    108 -20 bioset
+    109 -20 bioset
+    110 -20 bioset
+    112 -20 rk817-bat-monit
+    114 -20 rk817-dc-wq
+    115 -20 rk817-led-wq
+    116 -20 rk817-usb-wq
+    125 -20 bioset
+    127 -20 deferwq
+    128 -20 gpu_power_off_w
+    133 -20 kbase_job_fault
+    135 -20 bioset
+    176 -20 kworker/1:1H
+    196 -20 btrfs-worker
+    197 -20 btrfs-worker-hi
+    198 -20 btrfs-delalloc
+    199 -20 btrfs-flush_del
+    200 -20 btrfs-cache
+    201 -20 btrfs-submit
+    202 -20 btrfs-fixup
+    203 -20 btrfs-endio
+    204 -20 btrfs-endio-met
+    205 -20 btrfs-endio-met
+    206 -20 btrfs-endio-rai
+    207 -20 btrfs-endio-rep
+    208 -20 btrfs-rmw
+    209 -20 btrfs-endio-wri
+    210 -20 btrfs-freespace
+    211 -20 btrfs-delayed-m
+    212 -20 btrfs-readahead
+    213 -20 btrfs-qgroup-re
+    214 -20 btrfs-extent-re
+    228 -20 kworker/3:1H
+    233 -20 ipv6_addrconf
+    256 -20 kworker/0:1H
+    258 -20 kworker/2:1H
+    776 -20 kbase_event
+   3004 -20 kbase_event
+  15865 -20 kworker/u9:1
+  17611 -20 kworker/u9:2
+  19388 -20 kworker/u9:3
+  23270 -20 kworker/u9:0
+  23338 -20 dwc2
+
+-- where the limit is supposed to come from
+LimitNICE=0
+LimitNICESoft=0
+User=ark
+PAMName=
+limits.conf nice entries: ark              -       nice            -20
+
+  EXPECTED / WHAT IT DECIDES:
+    emulationstation.service runs with User=ark and no PAMName=, so pam_limits never
+    runs for it and the "ark - nice -20" line in limits.conf does NOT apply to anything
+    ES launches. LimitNICE= on the unit is the only mechanism that can work.
+    
+    BEFORE proposal 5: LimitNICE empty/0 and the ES process shows a nice priority limit
+      of 0. That CONFIRMS the diagnosis - all the "nice -n -19" calls in es_systems.cfg
+      fail silently with EPERM.
+    AFTER proposal 5:  LimitNICE=40 (systemd reports the rlimit form, not "-19").
+    If ES already shows a limit of 40 without the change, proposal 5 is wrong - revert it.
+
+===============================================================
+7. Q6 - how long does boot take and what costs the time? (sizes proposal 2)
+---------------------------------------------------------------
+
+-- systemd-analyze
+Startup finished in 5.474s (kernel) + 10.529s (userspace) = 16.004s 
+multi-user.target reached after 10.513s in userspace.
+
+-- systemd-analyze blame (top 20)
+3.056s ogage.service
+2.899s welcome-message.service
+2.892s dev-mmcblk0p2.device
+2.255s NetworkManager.service
+2.135s 351mp.service
+2.025s audiopath.service
+1.911s systemd-logind.service
+1.671s smbd.service
+1.334s systemd-udevd.service
+1.116s systemd-journal-flush.service
+ 919ms nmbd.service
+ 919ms networking.service
+ 850ms user@1000.service
+ 791ms systemd-journald.service
+ 637ms keyboard-setup.service
+ 635ms roms.mount
+ 615ms systemd-udev-trigger.service
+ 588ms systemd-timesyncd.service
+ 572ms systemd-hostnamed.service
+ 507ms dbus.service
+
+-- systemd-analyze critical-chain emulationstation.service
+The time when unit became active or started is printed after the "@" character.
+The time the unit took to start is printed after the "+" character.
+
+emulationstation.service @7.416s
+└─basic.target @4.780s
+  └─sockets.target @4.778s
+    └─systemd-hostnamed.socket @4.777s
+      └─sysinit.target @4.716s
+        └─systemd-tmpfiles-setup.service @4.500s +193ms
+          └─local-fs.target @4.460s
+            └─roms.mount @3.823s +635ms
+              └─dev-mmcblk0p3.device @3.467s
+
+-- welcome-message.service ordering
+Type=oneshot
+Before=
+After=system.slice firstboot.service local-fs.target
+
+  EXPECTED / WHAT IT DECIDES:
+    welcome-message.service near the top of "blame" with roughly 1.5 s, and
+    appearing in the critical chain of emulationstation.service, CONFIRMS
+    proposal 2. After the change it should drop out of the chain entirely and
+    ES should start that much earlier.
+    
+    Also read the total: 1.5 s out of 8 s matters, 1.5 s out of 60 s does not,
+    and in the second case the initrd (proposal 3) is the thing worth chasing.
+    systemd-analyze only covers the part AFTER the kernel starts - U-Boot time
+    has to be taken with a stopwatch, 3x before and 3x after.
+
+===============================================================
+8. Q7 - kernel debug options and decompressors compiled into THIS kernel
+---------------------------------------------------------------
+No kernel config found (/proc/config.gz, /boot/config-*).
+This is expected on dArkOS: the build copies the config into the
+rootfs /boot, which the FAT boot partition then mounts over.
+Nothing to report here - use the defconfig in the kernel repo instead.
+
+  EXPECTED / WHAT IT DECIDES:
+    CONFIG_RD_ZSTD absent (or "is not set") on 4.4 is the other half of the
+    proof for proposal 3. CONFIG_RD_LZ4=y means the fix will work.
+    CONFIG_IOSCHED_DEADLINE=y means proposal 1 will work.
+    CRYPTO_LZ4 not set explains a zram device that came up as lzo despite the
+    script asking for lz4 - that is a fallback, not a failure.
+    On RK3566, a long list of DEBUG_* set to y would mean the (out of scope)
+    proposal 9 also applies to that platform.
+
+===============================================================
+9. Q8 - zram, swap and memory at rest
+---------------------------------------------------------------
+
+-- memory
+               total        used        free      shared  buff/cache   available
+Mem:             895         334         297           9         287         560
+Swap:              0           0           0
+MemTotal:         916912 kB
+MemAvailable:     574156 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+Dirty:              1448 kB
+Writeback:             0 kB
+
+-- zram devices
+(zramctl not installed)
+/sys/block/zram0/comp_algorithm: [lzo] deflate 
+/sys/block/zram0/disksize: 0
+zram0 mm_stat (orig compr used ...): 0        0        0        0        0        0        0        0
+
+-- active swap
+/proc/swaps: Filename				Type		Size	Used	Priority
+
+-- zram-swap.service
+is-active: inactive
+○ zram-swap.service - ZRAM Compressed Swap for PortMaster & Gaming Performance
+     Loaded: loaded (/etc/systemd/system/zram-swap.service; enabled; preset: enabled)
+     Active: inactive (dead)
+
+-- vm tunables currently in force (verifies proposal 7 / the zram sysctls)
+/proc/sys/vm/dirty_bytes: 33554432
+/proc/sys/vm/dirty_background_bytes: 8388608
+/proc/sys/vm/dirty_ratio: 0
+/proc/sys/vm/dirty_background_ratio: 0
+/proc/sys/vm/swappiness: 10
+/proc/sys/vm/page-cluster: 0
+
+-- swap traffic over 3 seconds while idle (si/so columns)
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0      0 304312 102932 191896    0    0   116    88 1279   31  5  5 90  0  0  0
+ 0  0      0 304128 102932 192056    0    0     0     0 2077 3651  1  1 99  0  0  0
+ 0  0      0 304160 102932 192056    0    0     0     0 1997 3616  1  0 99  0  0  0
+
+  EXPECTED / WHAT IT DECIDES:
+    zramctl should list zram0 with a size around 1G and an algorithm the kernel
+    actually supports. On 4.4 RK3326 CRYPTO_LZ4 is not set, so a request for lz4
+    silently falls back - seeing lzo here is expected, not a failure. Empty output
+    means the zram swap service never came up at all.
+    
+    si/so staying at 0 while idle is healthy; non-zero at idle means the image is
+    already short of RAM before a game even starts.
+    
+    dirty_bytes 0 and dirty_ratio 20 = proposal 7 is NOT in this image yet.
+    dirty_bytes 33554432 and dirty_background_bytes 8388608 = it is.
+    swappiness 100 + page-cluster 0 = the zram service applied its sysctls.
+
+===============================================================
+Done. Nothing on this system was modified.
+Next: start a game and run "bash darkos-diag.sh game" over SSH.
+===============================================================
