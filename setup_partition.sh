@@ -18,7 +18,9 @@ if [ "$ROOT_FILESYSTEM_FORMAT" == "xfs" ] || [ "$ROOT_FILESYSTEM_FORMAT" == "btr
     else
       ROOT_FILESYSTEM_FORMAT_PARAMETERS="-f -L ROOTFS"
     fi
-    ROOT_FILESYSTEM_MOUNT_OPTIONS="defaults,noatime,compress=zlib:1"
+    # UNVERIFIED ON HARDWARE: btrfs 4.4 has no compress=<algo>:<level> syntax, so "zlib:1" is expected
+    # to fail the whole remount of /.  Settle it on a device: findmnt -no OPTIONS / ; mount -o remount /
+    ROOT_FILESYSTEM_MOUNT_OPTIONS="defaults,noatime,compress=lzo"
   fi
 elif [[ "$ROOT_FILESYSTEM_FORMAT" == *"ext"* ]]; then
   ROOT_FILESYSTEM_FORMAT_PARAMETERS="-F -L ROOTFS"
