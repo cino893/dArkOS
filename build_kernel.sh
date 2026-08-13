@@ -58,6 +58,18 @@ sudo cp /usr/bin/qemu-aarch64-static Arkbuild/usr/bin/
 KERNEL_VERSION=$(basename $(find Arkbuild/lib/modules -maxdepth 1 -mindepth 1 -type d))
 # Create symlink so depmod/initramfs can find modules for uname -r (host kernel)
 sudo touch Arkbuild/lib/modules/${KERNEL_VERSION}/modules.builtin.modinfo
+# UNVERIFIED ON HARDWARE: 4.4 has no CONFIG_RD_ZSTD, so the zstd initrd Debian builds by default is
+# likely discarded.  Settle it on a device: od -An -tx1 -j64 -N4 /boot/uInitrd (28 b5 2f fd = zstd).
+# Only the compressor is touched.  MODULES=dep would be resolved from the build host's /sys, which
+# bootstrap_rootfs.sh:36 bind mounts into the chroot, so it would pick the wrong drivers entirely.
+conf="Arkbuild/etc/initramfs-tools/initramfs.conf"
+[ -f "$conf" ] || { echo "FATAL: ${conf} is missing"; exit 1; }
+if grep -qE "^[[:space:]]*#?[[:space:]]*COMPRESS=" "$conf"; then
+  sudo sed -i -E "s|^[[:space:]]*#?[[:space:]]*COMPRESS=.*|COMPRESS=lz4|" "$conf"
+else
+  echo "COMPRESS=lz4" | sudo tee -a "$conf" > /dev/null
+fi
+grep -qx "COMPRESS=lz4" "$conf" || { echo "FATAL: could not set COMPRESS=lz4 in ${conf}"; exit 1; }
 call_chroot "uname() { echo ${KERNEL_VERSION}; }; export -f uname; depmod ${KERNEL_VERSION}; update-initramfs -c -k ${KERNEL_VERSION}"
 sudo rm Arkbuild/usr/bin/qemu-aarch64-static
 sudo cp Arkbuild/boot/initrd.img-* ${mountpoint}/initrd.img
