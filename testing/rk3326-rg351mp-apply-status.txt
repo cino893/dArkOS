@@ -1,22 +1,83 @@
 === APPLY OUTPUT ===
-   !! repository root looks wrong: /
-   !! missing: scripts/zram-swap.sh scripts/zram-swap.service scripts/portmaster-hooks.sh scripts/portmaster-hooks.service scripts/portmaster-hooks.path scripts/60-darkos-scheduler.rules scripts/60-darkos-readahead.rules scripts/60-darkos-writeback.conf portmaster/mod_dArkOS.txt
-   !! run this from inside a checkout of the PR branch, as testing/apply-to-installed.sh
+Applying PR #38 to the running system.
+repository : /home/ark/dArkOS
+platform   : rk3326
+backups    : /var/backups/darkos-pr38
+
+== 1.  PortMaster hook kept across updates + zram swap at boot (2ac3da2)
+   installed /usr/local/share/dArkOS/portmaster/mod_dArkOS.txt
+   installed /usr/local/bin/portmaster-hooks.sh
+   installed /usr/local/bin/zram-swap.sh
+   installed /etc/systemd/system/portmaster-hooks.service
+   installed /etc/systemd/system/portmaster-hooks.path
+   installed /etc/systemd/system/zram-swap.service
+   control folder recorded: /opt/system/Tools/PortMaster
+
+==      verifying that swap actually exists
+   /proc/swaps               : /dev/zram0=458452kB pri=32767
+   /sys/block/zram0/disksize : 469458944
+   /proc/meminfo SwapTotal   : 458452 kB
+
+== 3.  welcome-message.service no longer delays EmulationStation (45c43ae)
+   unit file: /etc/systemd/system/welcome-message.service
+   removed Before=emulationstation.service
+
+== 4.  root mount options: compress=lzo, drop ssd_spread (34b5670)
+   fstab now : defaults,noatime,compress=lzo,noatime
+   fstab want: defaults,noatime,compress=lzo,noatime
+
+==      proving the option set with a live remount
+   remount succeeded: rw,noatime,compress=lzo,ssd,noacl,space_cache,subvolid=5,subvol=/
+   /etc/fstab already asks for exactly this - no edit needed.
+
+== 5.  LimitNICE=-20 for EmulationStation (8ea33fd)
+   unit file: /etc/systemd/system/emulationstation.service (left untouched)
+   drop-in written: /etc/systemd/system/emulationstation.service.d/60-darkos-nice.conf
+
+== 6.  read_ahead_kb 512 via udev, both platforms (53455a5)
+   sysfs snapshot -> /var/backups/darkos-pr38/sysfs/read_ahead_kb: mmcblk0 512 
+   installed /etc/udev/rules.d/60-darkos-readahead.rules
+
+== systemctl daemon-reload
+
+== udev: reload rules and re-trigger block devices
+
+===============================================================
+SUMMARY
+---------------------------------------------------------------
+  1 portmaster hook        PASS  files installed, units enabled and started
+  1 zram swap              PASS  /dev/zram0=458452kB pri=32767 disksize=469458944
+  3 welcome-message        PASS  ordering removed
+  4 root mount options     PASS  already in fstab; live mount refreshed
+  5 LimitNICE              PASS  drop-in written (effective after ES restarts)
+  6 read-ahead             PASS  rule installed
+
+TAKES EFFECT ONLY AFTER A REBOOT:
+  - 3 welcome-message: the ordering only matters during boot
+  - 5 LimitNICE: EmulationStation must be restarted; this script will NOT do it
+
+This script deliberately does not restart emulationstation.service.
+Reboot when you are ready:  sudo reboot
 
 
 === STATUS OUTPUT ===
 PR #38 status on the running system (read from the live system, not from /var/backups/darkos-pr38).
 platform   : rk3326
 
-   1 portmaster+zram        PARTIAL   files=3/3 zram-swap=enabled hooks.path=enabled hooks.service=disabled
+   1 portmaster+zram        APPLIED   files=3/3 zram-swap=enabled hooks.path=enabled hooks.service=enabled
                                       swap: /dev/zram0=458452kB  /sys/block/zram0/disksize=469458944
-   2 scheduler              PARTIAL   rule=no live: mmcblk0=noop [deadline] cfq  
+   2 scheduler              REVERTED  deadline lost to cfq under a competing writer on an
+                                      RG351MP - see testing/rk3326-rg351mp-bench-all.txt
+                                      live: mmcblk0=noop [deadline] cfq  
    3 welcome-message        APPLIED   Before=(empty)
    4 root mount options     APPLIED   live: rw,noatime,compress=lzo,ssd,noacl,space_cache,subvolid=5,subvol=/
                                       fstab: defaults,noatime,compress=lzo,noatime
                                       systemd-remount-fs: active
-   5 LimitNICE              ABSENT    LimitNICE=0, drop-in=no
-   6 read-ahead             PARTIAL   rule=no live: mmcblk0=512 
-   7 writeback caps         APPLIED   file=yes dirty_bytes=33554432 dirty_background_bytes=8388608
+   5 LimitNICE              APPLIED   LimitNICE=40 (rlimit form of nice -20), drop-in=yes
+   6 read-ahead             APPLIED   rule=yes live: mmcblk0=512 
+   7 writeback caps         REVERTED  the cap cost 46->26 MB/s and the throttling point it
+                                      targets was never reached on an RG351MP - same log
+                                      live: dirty_bytes=33554432 dirty_background_bytes=8388608
 
-No backup directory at /var/backups/darkos-pr38: nothing has been applied from this script.
+A backup directory exists at /var/backups/darkos-pr38 (11 managed paths).
+It is NOT what the states above are read from - they come from the kernel and systemd.

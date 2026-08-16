@@ -3,13 +3,13 @@ dArkOS read-only diagnostics - mode: boot
 ===============================================================
 1. What machine is this
 ---------------------------------------------------------------
-date        : Sun Aug 16 05:53:57 PM CEST 2026
+date        : Sun Aug 16 07:38:08 PM CEST 2026
 kernel      : Linux 4.4.189 aarch64
 model       : HL-R36H-V20 2024-05-18
 PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
 VERSION_CODENAME=trixie
 soc / cpus  : RK3326 / 4
-uptime      : 297.69 s since boot
+uptime      : 6549.12 s since boot
 root device : mmcblk0p2
 
 -- sysfs nodes perfmax writes to (detected, not assumed)
@@ -48,7 +48,7 @@ LABEL=EASYROMS /roms exfat defaults,auto,umask=000,uid=1000,gid=1000,noatime 0 0
 is-failed: active
 ● systemd-remount-fs.service - Remount Root and Kernel File Systems
      Loaded: loaded (/usr/lib/systemd/system/systemd-remount-fs.service; enabled-runtime; preset: enabled)
-     Active: active (exited) since Sun 2026-08-16 17:49:00 CEST; 4min 57s ago
+     Active: active (exited) since Sun 2026-08-16 17:49:00 CEST; 1h 49min ago
  Invocation: d1c04bb1f8384ff682847d1d0ea9e3e8
        Docs: man:systemd-remount-fs.service(8)
              https://systemd.io/API_FILE_SYSTEMS
@@ -66,11 +66,12 @@ is-failed: active
 [    9.979656] proc: unrecognized mount option "hidepid=invisible" or missing value
 [   32.358115] proc: unrecognized mount option "hidepid=invisible" or missing value
 [   70.790380] proc: unrecognized mount option "hidepid=invisible" or missing value
+[  966.907129] BTRFS info (device mmcblk0p2): disk space caching is enabled
 
 -- btrfs space accounting (only meaningful if / really is btrfs)
 Data, single: total=4.41GiB, used=3.97GiB
 System, DUP: total=32.00MiB, used=16.00KiB
-Metadata, DUP: total=800.00MiB, used=89.92MiB
+Metadata, DUP: total=800.00MiB, used=90.02MiB
 GlobalReserve, single: total=32.00MiB, used=0.00B
 
   EXPECTED / WHAT IT DECIDES:
@@ -123,11 +124,11 @@ GlobalReserve, single: total=32.00MiB, used=0.00B
 ---------------------------------------------------------------
 NOTE: only meaningful if run shortly after boot and BEFORE any game,
       because the @reboot cron job runs perfnorm and switches to ondemand.
-seconds since boot: 298.33
+seconds since boot: 6549.59
 
 -- /sys/devices/system/cpu/cpufreq/policy0
 /sys/devices/system/cpu/cpufreq/policy0/scaling_governor: ondemand
-/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq: 1296000
+/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq: 1512000
 /sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq: 1008000
 /sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq: 1512000
 /sys/devices/system/cpu/cpufreq/policy0/scaling_available_frequencies: 1008000 1200000 1248000 1296000 1512000 
@@ -243,13 +244,10 @@ pid 746     emulationstatio      Max nice priority 0 0
     125 -20 bioset
     127 -20 deferwq
     128 -20 gpu_power_off_w
-    129 -20 kworker/u9:0
     131 -20 kworker/u9:1
     132 -20 kbase_job_fault
-    133 -20 kworker/u9:2
     171 -20 bioset
     173 -20 kworker/2:1H
-    181 -20 dwc2
     199 -20 btrfs-worker
     200 -20 btrfs-worker-hi
     201 -20 btrfs-delalloc
@@ -273,14 +271,17 @@ pid 746     emulationstatio      Max nice priority 0 0
     236 -20 kworker/1:1H
     237 -20 ipv6_addrconf
     267 -20 kworker/3:1H
-    318 -20 kworker/u9:3
     319 -20 kworker/u9:4
     840 -20 kbase_event
    2127 -20 kbase_event
+   6260 -20 kworker/u9:0
+   8190 -20 kworker/u9:2
+   8194 -20 kworker/u9:3
+   8540 -20 dwc2
 
 -- where the limit is supposed to come from
-LimitNICE=0
-LimitNICESoft=0
+LimitNICE=40
+LimitNICESoft=40
 User=ark
 PAMName=
 limits.conf nice entries: ark              -       nice            -20
@@ -317,28 +318,29 @@ multi-user.target reached after 28.292s in userspace.
 3.044s dbus.service
 2.689s systemd-journal-flush.service
 2.654s systemd-udevd.service
-2.149s batt_led.service
 1.266s zram-swap.service
 1.240s systemd-fsck@dev-disk-by\x2dlabel-BOOT.service
-1.215s systemd-rfkill.service
 1.188s keyboard-setup.service
 1.086s autosuspend.service
  942ms nmbd.service
  871ms systemd-udev-trigger.service
+ 866ms wpa_supplicant.service
+ 859ms user@1000.service
 
 -- systemd-analyze critical-chain emulationstation.service
 The time when unit became active or started is printed after the "@" character.
 The time the unit took to start is printed after the "+" character.
 
 emulationstation.service @19.261s
-└─basic.target @18.871s
-  └─sockets.target @18.870s
-    └─sshd-unix-local.socket @18.870s
-      └─sysinit.target @18.777s
-        └─systemd-tmpfiles-setup.service @18.455s +313ms
-          └─local-fs.target @18.386s
-            └─roms.mount @8.753s +9.631s
-              └─dev-mmcblk0p3.device @8.668s
+└─zram-swap.service @19.001s +1.266s
+  └─basic.target @18.871s
+    └─sockets.target @18.870s
+      └─sshd-unix-local.socket @18.870s
+        └─sysinit.target @18.777s
+          └─systemd-tmpfiles-setup.service @18.455s +313ms
+            └─local-fs.target @18.386s
+              └─roms.mount @8.753s +9.631s
+                └─dev-mmcblk0p3.device @8.668s
 
 -- welcome-message.service ordering
 Type=oneshot
@@ -379,13 +381,13 @@ Nothing to report here - use the defconfig in the kernel repo instead.
 
 -- memory
                total        used        free      shared  buff/cache   available
-Mem:             895         385         363           9         170         509
+Mem:             895         387         356           9         175         507
 Swap:            447           0         447
 MemTotal:         916912 kB
-MemAvailable:     522020 kB
+MemAvailable:     519736 kB
 SwapTotal:        458452 kB
 SwapFree:         458452 kB
-Dirty:               664 kB
+Dirty:               776 kB
 Writeback:             0 kB
 
 -- zram devices
@@ -400,9 +402,9 @@ zram0 mm_stat (orig compr used ...): 4096       76    12288        0    12288   
 
 -- zram-swap.service
 is-active: active
-● zram-swap.service - ZRAM Compressed Swap for PortMaster & Gaming Performance
+● zram-swap.service - Compressed in-RAM swap (zram0)
      Loaded: loaded (/etc/systemd/system/zram-swap.service; enabled; preset: enabled)
-     Active: active (exited) since Sun 2026-08-16 17:49:17 CEST; 4min 50s ago
+     Active: active (exited) since Sun 2026-08-16 17:49:17 CEST; 1h 49min ago
  Invocation: d004d62c45c24a25ace11f20dffe1883
    Main PID: 474 (code=exited, status=0/SUCCESS)
 
@@ -417,9 +419,9 @@ is-active: active
 -- swap traffic over 3 seconds while idle (si/so columns)
 procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
  r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
- 0  0      0 372300    468 173816    0    0  6381  8653 4578   13  4  6 76 14  0  0
- 0  0      0 372532    468 173884    0    0     0     0 2341 3595  1  0 99  0  0  0
- 3  1      0 372532    468 173884    0    0    96    24 2593 3831  1  1 99  0  0  0
+ 0  0      0 364848    488 179432    0    0   566   853  618   29  6  9 74 11  0  0
+ 1  0      0 364760    488 179588    0    0     0     0 2525 3790  1  1 98  0  0  0
+ 0  0      0 364792    488 179588    0    0     0     0 2129 3528  0  1 99  0  0  0
 
   EXPECTED / WHAT IT DECIDES:
     zramctl should list zram0 with a size around 1G and an algorithm the kernel

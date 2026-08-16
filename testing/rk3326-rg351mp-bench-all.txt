@@ -1,5 +1,5 @@
 dArkOS A/B benchmark - mode: all
-kernel 4.4.189   Sun Aug 16 17:52:11 CEST 2026
+kernel 4.4.189   Sun Aug 16 19:36:12 CEST 2026
 
 ===============================================================
 1. Setup
@@ -7,10 +7,10 @@ kernel 4.4.189   Sun Aug 16 17:52:11 CEST 2026
 
 -- timing primitive
    chosen        : EPOCHREALTIME (bash builtin, us)
-   EPOCHREALTIME : 1786895531.853582
-   date +%s%N    : 1786895531858652648
-   /proc/uptime  : 192.05
-   6 back-to-back readings (ms): 1786895531867 1786895531867 1786895531867 1786895531867 1786895531868 1786895531868
+   EPOCHREALTIME : 1786901772.518788
+   date +%s%N    : 1786901772523151336
+   /proc/uptime  : 6432.71
+   6 back-to-back readings (ms): 1786901772531 1786901772531 1786901772531 1786901772532 1786901772532 1786901772532
    sleep 1 measured as 1004 ms
    -> this is a millisecond clock and it runs at the right rate
 
@@ -24,11 +24,11 @@ kernel 4.4.189   Sun Aug 16 17:52:11 CEST 2026
    filesystem        : exfat on /dev/mmcblk0p3, fuse=no, compression=no
    free space        : 46635 MB
    queue             : /sys/class/block/mmcblk0/queue
-   restore script    : /tmp/darkos-bench-restore.3226 (deleted on a clean or interrupted exit)
+   restore script    : /tmp/darkos-bench-restore.10060 (deleted on a clean or interrupted exit)
 
 -- incompressible source buffer
-   location : /dev/shm/darkos-bench-seed.3226
-   8 MB from /dev/urandom took 2234 ms
+   location : /dev/shm/darkos-bench-seed.10060
+   8 MB from /dev/urandom took 2233 ms
    -> that is about 3 MB/s: streaming it
       directly would have measured the random pool, not the card
 
@@ -40,7 +40,7 @@ kernel 4.4.189   Sun Aug 16 17:52:11 CEST 2026
    vm.dirty_background_bytes : 8388608
    /etc/sysctl.d/60-darkos-writeback.conf: present
    /etc/udev/rules.d/60-darkos-scheduler.rules: absent
-   /etc/udev/rules.d/60-darkos-readahead.rules: absent
+   /etc/udev/rules.d/60-darkos-readahead.rules: present
    / mount options       : /dev/mmcblk0p2 / btrfs rw,noatime,compress=lzo,ssd,noacl,space_cache,subvolid=5,subvol=/
    page cache            : /proc/sys/vm/drop_caches accepted a 3 - every read
                            arm below starts cold, and each one drops it again
@@ -87,20 +87,20 @@ kernel 4.4.189   Sun Aug 16 17:52:11 CEST 2026
 
 -- arm A - baseline: ratios, as the kernel ships them
    in force now: dirty_ratio=20 dirty_background_ratio=10 dirty_bytes=0 dirty_background_bytes=0
-   chunk latency          n=134  min     28  med     43  p95    255  max    625  total   11748 ms
-   closing sync                : 231 ms
+   chunk latency          n=134  min     26  med     54  p95    249  max    483  total   10769 ms
+   closing sync                : 809 ms
    peak Dirty seen during it   : 48 MB
 
 -- arm B - treatment: dirty_bytes=32M / dirty_background_bytes=8M
    in force now: dirty_ratio=0 dirty_background_ratio=0 dirty_bytes=33554432 dirty_background_bytes=8388608
-   chunk latency          n=134  min     26  med     72  p95    359  max    575  total   20558 ms
-   closing sync                : 350 ms
+   chunk latency          n=134  min     25  med     65  p95    318  max   1404  total   17673 ms
+   closing sync                : 441 ms
    peak Dirty seen during it   : 8 MB
 
 -- side by side
    arm                 med        p95        max       sync    peak MB
-   baseline             43        255        625        231         48
-   treatment            72        359        575        350          8
+   baseline             54        249        483        809         48
+   treatment            65        318       1404        441          8
 
   WHAT THIS DECIDES:
     The claim is about the worst case, so max, p95 and the closing sync are
@@ -129,18 +129,18 @@ kernel 4.4.189   Sun Aug 16 17:52:11 CEST 2026
                 pass, running for the whole of every foreground read
    reps       : 3 per scheduler, arms interleaved so a card that slows
                 down over the run cannot favour either one
-   rep 1  cfq       read   4451 ms   background passes during it: 11
-   rep 1  deadline  read   5948 ms   background passes during it: 28
-   rep 2  cfq       read   3977 ms   background passes during it: 15
-   rep 2  deadline  read   5706 ms   background passes during it: 28
-   rep 3  cfq       read   3163 ms   background passes during it: 10
-   rep 3  deadline  read   5414 ms   background passes during it: 26
+   rep 1  cfq       read   4080 ms   background passes during it: 16
+   rep 1  deadline  read   6611 ms   background passes during it: 29
+   rep 2  cfq       read   5532 ms   background passes during it: 28
+   rep 2  deadline  read   6074 ms   background passes during it: 31
+   rep 3  cfq       read   3945 ms   background passes during it: 16
+   rep 3  deadline  read   5578 ms   background passes during it: 26
 
 -- result
-   cfq read               n=3    min   3163  med   3977  p95   4451  max   4451  total   11591 ms
-   deadline read          n=3    min   5414  med   5706  p95   5948  max   5948  total   17068 ms
-   median throughput: cfq 32 MB/s, deadline 22 MB/s
-   background writer did 161 passes, 5152 MB written by it in total
+   cfq read               n=3    min   3945  med   4080  p95   5532  max   5532  total   13557 ms
+   deadline read          n=3    min   5578  med   6074  p95   6611  max   6611  total   18263 ms
+   median throughput: cfq 31 MB/s, deadline 21 MB/s
+   background writer did 189 passes, 6048 MB written by it in total
 
   WHAT THIS DECIDES:
     CFQ's cost is slice_idle: it holds the device idle for a few milliseconds
@@ -159,16 +159,16 @@ kernel 4.4.189   Sun Aug 16 17:52:11 CEST 2026
 -- load
    cold sequential read of 128 MB, no competing I/O, 3 reps per arm,
    arms interleaved.  read_ahead_kb is set on /sys/class/block/mmcblk0/queue.
-   rep 1  128 KB    read   2174 ms  (58 MB/s)
-   rep 1  512 KB    read   2013 ms  (63 MB/s)
-   rep 2  128 KB    read   2080 ms  (61 MB/s)
-   rep 2  512 KB    read   1989 ms  (64 MB/s)
-   rep 3  128 KB    read   2065 ms  (61 MB/s)
-   rep 3  512 KB    read   2114 ms  (60 MB/s)
+   rep 1  128 KB    read   2261 ms  (56 MB/s)
+   rep 1  512 KB    read   2105 ms  (60 MB/s)
+   rep 2  128 KB    read   2803 ms  (45 MB/s)
+   rep 2  512 KB    read   4973 ms  (25 MB/s)
+   rep 3  128 KB    read   5253 ms  (24 MB/s)
+   rep 3  512 KB    read   5296 ms  (24 MB/s)
 
 -- result
-   128 KB read            n=3    min   2065  med   2080  p95   2174  max   2174  total    6319 ms
-   512 KB read            n=3    min   1989  med   2013  p95   2114  max   2114  total    6116 ms
+   128 KB read            n=3    min   2261  med   2803  p95   5253  max   5253  total   10317 ms
+   512 KB read            n=3    min   2105  med   4973  p95   5296  max   5296  total   12374 ms
 
   WHAT THIS DECIDES:
     The first unit to run this reported 100 MB in 1858 ms at 128 KB and
@@ -182,8 +182,8 @@ kernel 4.4.189   Sun Aug 16 17:52:11 CEST 2026
 ---------------------------------------------------------------
 
 -- 1. what the unit asks for
-   LimitNICE=0
-   LimitNICESoft=0
+   LimitNICE=40
+   LimitNICESoft=40
    User=ark
    PAMName=
    FragmentPath=/etc/systemd/system/emulationstation.service
@@ -235,13 +235,13 @@ CLAIM 1 - 05945cf, vm.dirty_bytes=32M cuts the worst-case write stall
   this change is about.  Re-run with a larger --size.
 
 CLAIM 2 - 114e557, deadline beats CFQ on RK3326 under competing I/O
-  foreground read, median of 3: cfq 3977 ms, deadline 5706 ms (-1729 ms, -30%)
-  competing writer: 5152 MB written during the run
+  foreground read, median of 3: cfq 4080 ms, deadline 6074 ms (-1994 ms, -32%)
+  competing writer: 6048 MB written during the run
   NOT SUPPORTED - cfq is the faster one here.  Revert 114e557.
 
 SUPPORTING - 4442105, read_ahead_kb=512
-  128 KB 2080 ms, 512 KB 2013 ms, 3% apart
-  Neither confirms nor contradicts: within noise on this unit.
+  128 KB 2803 ms, 512 KB 4973 ms, -43% apart
+  CONTRADICTS the earlier result: 128 KB is faster on this unit.
 
 SUPPORTING - 8fe20cc, LimitNICE=-20
   as ark with PAM (su)          : nice came out as -19
