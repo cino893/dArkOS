@@ -294,6 +294,7 @@ scripts/portmaster-hooks.sh
 scripts/portmaster-hooks.service
 scripts/portmaster-hooks.path
 scripts/60-darkos-readahead.rules
+scripts/alsoft.conf
 portmaster/mod_dArkOS.txt
 "
 
@@ -334,6 +335,8 @@ apply_1_portmaster() {
     install_file "${REPO}/scripts/portmaster-hooks.service" /etc/systemd/system/portmaster-hooks.service || ok=1
     install_file "${REPO}/scripts/portmaster-hooks.path"    /etc/systemd/system/portmaster-hooks.path    || ok=1
     install_file "${REPO}/scripts/zram-swap.service"        /etc/systemd/system/zram-swap.service        || ok=1
+    mkdir -p /etc/openal 2>/dev/null
+    install_file "${REPO}/scripts/alsoft.conf"              /etc/openal/alsoft.conf 644                  || ok=1
 
     # The hook units copy every staged .txt into the PortMaster control folder,
     # so those targets have to be recorded BEFORE the units are started or undo
