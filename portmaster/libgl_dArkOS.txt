@@ -7,10 +7,6 @@ source "${controlfolder}/libgl_default.txt"
 
 export LIBGL_NOERROR=1
 export LIBGL_NOBANNER=1
-export LIBGL_USEVBO=1
-export LIBGL_BATCH=1
-export LIBGL_BATCH_MAX=250
-export LIBGL_GLXRECYCLE=1
 
 if [ -f "$HOME/.config/portmaster_show_fps" ]; then
   export LIBGL_NOBANNER=0
