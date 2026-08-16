@@ -1,0 +1,22 @@
+=== APPLY OUTPUT ===
+   !! repository root looks wrong: /
+   !! missing: scripts/zram-swap.sh scripts/zram-swap.service scripts/portmaster-hooks.sh scripts/portmaster-hooks.service scripts/portmaster-hooks.path scripts/60-darkos-scheduler.rules scripts/60-darkos-readahead.rules scripts/60-darkos-writeback.conf portmaster/mod_dArkOS.txt
+   !! run this from inside a checkout of the PR branch, as testing/apply-to-installed.sh
+
+
+=== STATUS OUTPUT ===
+PR #38 status on the running system (read from the live system, not from /var/backups/darkos-pr38).
+platform   : rk3326
+
+   1 portmaster+zram        PARTIAL   files=3/3 zram-swap=enabled hooks.path=enabled hooks.service=disabled
+                                      swap: /dev/zram0=458452kB  /sys/block/zram0/disksize=469458944
+   2 scheduler              PARTIAL   rule=no live: mmcblk0=noop [deadline] cfq  
+   3 welcome-message        APPLIED   Before=(empty)
+   4 root mount options     APPLIED   live: rw,noatime,compress=lzo,ssd,noacl,space_cache,subvolid=5,subvol=/
+                                      fstab: defaults,noatime,compress=lzo,noatime
+                                      systemd-remount-fs: active
+   5 LimitNICE              ABSENT    LimitNICE=0, drop-in=no
+   6 read-ahead             PARTIAL   rule=no live: mmcblk0=512 
+   7 writeback caps         APPLIED   file=yes dirty_bytes=33554432 dirty_background_bytes=8388608
+
+No backup directory at /var/backups/darkos-pr38: nothing has been applied from this script.

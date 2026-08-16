@@ -3,13 +3,13 @@ dArkOS read-only diagnostics - mode: boot
 ===============================================================
 1. What machine is this
 ---------------------------------------------------------------
-date        : Thu Aug 13 04:06:00 PM CEST 2026
+date        : Sun Aug 16 05:53:57 PM CEST 2026
 kernel      : Linux 4.4.189 aarch64
 model       : HL-R36H-V20 2024-05-18
 PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
 VERSION_CODENAME=trixie
 soc / cpus  : RK3326 / 4
-uptime      : 7254.81 s since boot
+uptime      : 297.69 s since boot
 root device : mmcblk0p2
 
 -- sysfs nodes perfmax writes to (detected, not assumed)
@@ -48,32 +48,29 @@ LABEL=EASYROMS /roms exfat defaults,auto,umask=000,uid=1000,gid=1000,noatime 0 0
 is-failed: active
 ● systemd-remount-fs.service - Remount Root and Kernel File Systems
      Loaded: loaded (/usr/lib/systemd/system/systemd-remount-fs.service; enabled-runtime; preset: enabled)
-     Active: active (exited) since Thu 2026-08-13 14:59:13 CEST; 1h 6min ago
- Invocation: 0187cf9456314d0e89db11e5285034c0
+     Active: active (exited) since Sun 2026-08-16 17:49:00 CEST; 4min 57s ago
+ Invocation: d1c04bb1f8384ff682847d1d0ea9e3e8
        Docs: man:systemd-remount-fs.service(8)
              https://systemd.io/API_FILE_SYSTEMS
-   Main PID: 19383 (code=exited, status=0/SUCCESS)
+   Main PID: 263 (code=exited, status=0/SUCCESS)
 
 -- btrfs complaints in the kernel log
-[    2.971744] Btrfs loaded
-[    4.611495] BTRFS: device label ROOTFS devid 1 transid 2181 /dev/mmcblk0p2
-[    4.894986] BTRFS info (device mmcblk0p2): disk space caching is enabled
-[    4.895007] BTRFS: has skinny extents
-[    4.912307] BTRFS: detected SSD devices, enabling SSD mode
-[    6.521441] systemd[1]: Starting systemd-remount-fs.service - Remount Root and Kernel File Systems...
-[    6.694558] systemd[1]: systemd-remount-fs.service: Main process exited, code=exited, status=1/FAILURE
-[    6.695107] systemd[1]: systemd-remount-fs.service: Failed with result 'exit-code'.
-[    6.695663] systemd[1]: Failed to start systemd-remount-fs.service - Remount Root and Kernel File Systems.
-[    7.095557] proc: unrecognized mount option "hidepid=invisible" or missing value
-[   13.142083] proc: unrecognized mount option "hidepid=invisible" or missing value
-[  234.082416] proc: unrecognized mount option "hidepid=invisible" or missing value
-[ 3247.318037] BTRFS info (device mmcblk0p2): setting 8 feature flag
-[ 3247.318059] BTRFS info (device mmcblk0p2): disk space caching is enabled
+[    2.964934] Btrfs loaded
+[    4.198075] BTRFS: device label ROOTFS devid 1 transid 2347 /dev/mmcblk0p2
+[    4.921478] BTRFS info (device mmcblk0p2): disk space caching is enabled
+[    4.921497] BTRFS: has skinny extents
+[    5.129568] BTRFS: detected SSD devices, enabling SSD mode
+[    9.058656] systemd[1]: Starting systemd-remount-fs.service - Remount Root and Kernel File Systems...
+[    9.601013] BTRFS info (device mmcblk0p2): disk space caching is enabled
+[    9.604709] systemd[1]: Finished systemd-remount-fs.service - Remount Root and Kernel File Systems.
+[    9.979656] proc: unrecognized mount option "hidepid=invisible" or missing value
+[   32.358115] proc: unrecognized mount option "hidepid=invisible" or missing value
+[   70.790380] proc: unrecognized mount option "hidepid=invisible" or missing value
 
 -- btrfs space accounting (only meaningful if / really is btrfs)
 Data, single: total=4.41GiB, used=3.97GiB
 System, DUP: total=32.00MiB, used=16.00KiB
-Metadata, DUP: total=800.00MiB, used=89.94MiB
+Metadata, DUP: total=800.00MiB, used=89.92MiB
 GlobalReserve, single: total=32.00MiB, used=0.00B
 
   EXPECTED / WHAT IT DECIDES:
@@ -101,8 +98,8 @@ GlobalReserve, single: total=32.00MiB, used=0.00B
  1f 8b 08 00
 
 -- what the kernel said about the initramfs
-[    1.436373] Trying to unpack rootfs image as initramfs...
-[    2.586501] Freeing initrd memory: 11320K
+[    1.436285] Trying to unpack rootfs image as initramfs...
+[    2.586040] Freeing initrd memory: 11320K
 
   EXPECTED / WHAT IT DECIDES:
     Payload magic decoder:
@@ -126,11 +123,11 @@ GlobalReserve, single: total=32.00MiB, used=0.00B
 ---------------------------------------------------------------
 NOTE: only meaningful if run shortly after boot and BEFORE any game,
       because the @reboot cron job runs perfnorm and switches to ondemand.
-seconds since boot: 7255.28
+seconds since boot: 298.33
 
 -- /sys/devices/system/cpu/cpufreq/policy0
 /sys/devices/system/cpu/cpufreq/policy0/scaling_governor: ondemand
-/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq: 1512000
+/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq: 1296000
 /sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq: 1008000
 /sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq: 1512000
 /sys/devices/system/cpu/cpufreq/policy0/scaling_available_frequencies: 1008000 1200000 1248000 1296000 1512000 
@@ -162,7 +159,7 @@ mmcblk0     116.5G disk
 ├─mmcblk0p1   100M part /boot
 ├─mmcblk0p2  10.4G part /
 └─mmcblk0p3   106G part /roms
-zram0           0B disk 
+zram0       447.7M disk [SWAP]
 
 -- /sys/block/mmcblk0 <- holds /
 /sys/block/mmcblk0/queue/scheduler: noop [deadline] cfq 
@@ -198,12 +195,12 @@ NOTE: this mode only shows whether the LIMIT exists. Whether the emulator
 
 -- emulator / ES processes and their nice level
     PID  NI PRI COMMAND
-    733   0  19 emulationstatio
-    759   0  19 emulationstatio
+    510   0  19 emulationstatio
+    746   0  19 emulationstatio
 
 -- RLIMIT_NICE of those processes
-pid 733     emulationstatio      Max nice priority 0 0 
-pid 759     emulationstatio      Max nice priority 0 0 
+pid 510     emulationstatio      Max nice priority 0 0 
+pid 746     emulationstatio      Max nice priority 0 0 
 
 -- everything currently running at a negative nice level
     PID  NI COMMAND
@@ -246,39 +243,40 @@ pid 759     emulationstatio      Max nice priority 0 0
     125 -20 bioset
     127 -20 deferwq
     128 -20 gpu_power_off_w
-    133 -20 kbase_job_fault
-    135 -20 bioset
-    176 -20 kworker/1:1H
-    196 -20 btrfs-worker
-    197 -20 btrfs-worker-hi
-    198 -20 btrfs-delalloc
-    199 -20 btrfs-flush_del
-    200 -20 btrfs-cache
-    201 -20 btrfs-submit
-    202 -20 btrfs-fixup
-    203 -20 btrfs-endio
-    204 -20 btrfs-endio-met
-    205 -20 btrfs-endio-met
-    206 -20 btrfs-endio-rai
-    207 -20 btrfs-endio-rep
-    208 -20 btrfs-rmw
-    209 -20 btrfs-endio-wri
-    210 -20 btrfs-freespace
-    211 -20 btrfs-delayed-m
-    212 -20 btrfs-readahead
-    213 -20 btrfs-qgroup-re
-    214 -20 btrfs-extent-re
-    228 -20 kworker/3:1H
-    233 -20 ipv6_addrconf
-    256 -20 kworker/0:1H
-    258 -20 kworker/2:1H
-    776 -20 kbase_event
-   3004 -20 kbase_event
-  15865 -20 kworker/u9:1
-  17611 -20 kworker/u9:2
-  19388 -20 kworker/u9:3
-  23270 -20 kworker/u9:0
-  23338 -20 dwc2
+    129 -20 kworker/u9:0
+    131 -20 kworker/u9:1
+    132 -20 kbase_job_fault
+    133 -20 kworker/u9:2
+    171 -20 bioset
+    173 -20 kworker/2:1H
+    181 -20 dwc2
+    199 -20 btrfs-worker
+    200 -20 btrfs-worker-hi
+    201 -20 btrfs-delalloc
+    202 -20 btrfs-flush_del
+    203 -20 btrfs-cache
+    204 -20 btrfs-submit
+    205 -20 btrfs-fixup
+    206 -20 btrfs-endio
+    207 -20 btrfs-endio-met
+    208 -20 btrfs-endio-met
+    209 -20 btrfs-endio-rai
+    210 -20 btrfs-endio-rep
+    211 -20 btrfs-rmw
+    212 -20 btrfs-endio-wri
+    213 -20 btrfs-freespace
+    214 -20 btrfs-delayed-m
+    215 -20 btrfs-readahead
+    216 -20 btrfs-qgroup-re
+    217 -20 btrfs-extent-re
+    232 -20 kworker/0:1H
+    236 -20 kworker/1:1H
+    237 -20 ipv6_addrconf
+    267 -20 kworker/3:1H
+    318 -20 kworker/u9:3
+    319 -20 kworker/u9:4
+    840 -20 kbase_event
+   2127 -20 kbase_event
 
 -- where the limit is supposed to come from
 LimitNICE=0
@@ -303,49 +301,49 @@ limits.conf nice entries: ark              -       nice            -20
 ---------------------------------------------------------------
 
 -- systemd-analyze
-Startup finished in 5.474s (kernel) + 10.529s (userspace) = 16.004s 
-multi-user.target reached after 10.513s in userspace.
+Startup finished in 6.367s (kernel) + 28.299s (userspace) = 34.667s 
+multi-user.target reached after 28.292s in userspace.
 
 -- systemd-analyze blame (top 20)
-3.056s ogage.service
-2.899s welcome-message.service
-2.892s dev-mmcblk0p2.device
-2.255s NetworkManager.service
-2.135s 351mp.service
-2.025s audiopath.service
-1.911s systemd-logind.service
-1.671s smbd.service
-1.334s systemd-udevd.service
-1.116s systemd-journal-flush.service
- 919ms nmbd.service
- 919ms networking.service
- 850ms user@1000.service
- 791ms systemd-journald.service
- 637ms keyboard-setup.service
- 635ms roms.mount
- 615ms systemd-udev-trigger.service
- 588ms systemd-timesyncd.service
- 572ms systemd-hostnamed.service
- 507ms dbus.service
+9.631s roms.mount
+6.242s dev-mmcblk0p2.device
+6.050s NetworkManager.service
+5.241s welcome-message.service
+3.483s smbd.service
+3.447s dpkg-db-backup.service
+3.258s 351mp.service
+3.134s audiopath.service
+3.046s ogage.service
+3.044s dbus.service
+2.689s systemd-journal-flush.service
+2.654s systemd-udevd.service
+2.149s batt_led.service
+1.266s zram-swap.service
+1.240s systemd-fsck@dev-disk-by\x2dlabel-BOOT.service
+1.215s systemd-rfkill.service
+1.188s keyboard-setup.service
+1.086s autosuspend.service
+ 942ms nmbd.service
+ 871ms systemd-udev-trigger.service
 
 -- systemd-analyze critical-chain emulationstation.service
 The time when unit became active or started is printed after the "@" character.
 The time the unit took to start is printed after the "+" character.
 
-emulationstation.service @7.416s
-└─basic.target @4.780s
-  └─sockets.target @4.778s
-    └─systemd-hostnamed.socket @4.777s
-      └─sysinit.target @4.716s
-        └─systemd-tmpfiles-setup.service @4.500s +193ms
-          └─local-fs.target @4.460s
-            └─roms.mount @3.823s +635ms
-              └─dev-mmcblk0p3.device @3.467s
+emulationstation.service @19.261s
+└─basic.target @18.871s
+  └─sockets.target @18.870s
+    └─sshd-unix-local.socket @18.870s
+      └─sysinit.target @18.777s
+        └─systemd-tmpfiles-setup.service @18.455s +313ms
+          └─local-fs.target @18.386s
+            └─roms.mount @8.753s +9.631s
+              └─dev-mmcblk0p3.device @8.668s
 
 -- welcome-message.service ordering
 Type=oneshot
 Before=
-After=system.slice firstboot.service local-fs.target
+After=local-fs.target system.slice firstboot.service
 
   EXPECTED / WHAT IT DECIDES:
     welcome-message.service near the top of "blame" with roughly 1.5 s, and
@@ -381,44 +379,47 @@ Nothing to report here - use the defconfig in the kernel repo instead.
 
 -- memory
                total        used        free      shared  buff/cache   available
-Mem:             895         334         297           9         287         560
-Swap:              0           0           0
+Mem:             895         385         363           9         170         509
+Swap:            447           0         447
 MemTotal:         916912 kB
-MemAvailable:     574156 kB
-SwapTotal:             0 kB
-SwapFree:              0 kB
-Dirty:              1448 kB
+MemAvailable:     522020 kB
+SwapTotal:        458452 kB
+SwapFree:         458452 kB
+Dirty:               664 kB
 Writeback:             0 kB
 
 -- zram devices
 (zramctl not installed)
 /sys/block/zram0/comp_algorithm: [lzo] deflate 
-/sys/block/zram0/disksize: 0
-zram0 mm_stat (orig compr used ...): 0        0        0        0        0        0        0        0
+/sys/block/zram0/disksize: 469458944
+zram0 mm_stat (orig compr used ...): 4096       76    12288        0    12288        0        0        0
 
 -- active swap
 /proc/swaps: Filename				Type		Size	Used	Priority
+/dev/zram0                              partition	458452	0	32767
 
 -- zram-swap.service
-is-active: inactive
-○ zram-swap.service - ZRAM Compressed Swap for PortMaster & Gaming Performance
+is-active: active
+● zram-swap.service - ZRAM Compressed Swap for PortMaster & Gaming Performance
      Loaded: loaded (/etc/systemd/system/zram-swap.service; enabled; preset: enabled)
-     Active: inactive (dead)
+     Active: active (exited) since Sun 2026-08-16 17:49:17 CEST; 4min 50s ago
+ Invocation: d004d62c45c24a25ace11f20dffe1883
+   Main PID: 474 (code=exited, status=0/SUCCESS)
 
 -- vm tunables currently in force (verifies proposal 7 / the zram sysctls)
 /proc/sys/vm/dirty_bytes: 33554432
 /proc/sys/vm/dirty_background_bytes: 8388608
 /proc/sys/vm/dirty_ratio: 0
 /proc/sys/vm/dirty_background_ratio: 0
-/proc/sys/vm/swappiness: 10
-/proc/sys/vm/page-cluster: 0
+/proc/sys/vm/swappiness: 60
+/proc/sys/vm/page-cluster: 3
 
 -- swap traffic over 3 seconds while idle (si/so columns)
 procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
  r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
- 0  0      0 304312 102932 191896    0    0   116    88 1279   31  5  5 90  0  0  0
- 0  0      0 304128 102932 192056    0    0     0     0 2077 3651  1  1 99  0  0  0
- 0  0      0 304160 102932 192056    0    0     0     0 1997 3616  1  0 99  0  0  0
+ 0  0      0 372300    468 173816    0    0  6381  8653 4578   13  4  6 76 14  0  0
+ 0  0      0 372532    468 173884    0    0     0     0 2341 3595  1  0 99  0  0  0
+ 3  1      0 372532    468 173884    0    0    96    24 2593 3831  1  1 99  0  0  0
 
   EXPECTED / WHAT IT DECIDES:
     zramctl should list zram0 with a size around 1G and an algorithm the kernel

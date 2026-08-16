@@ -1,0 +1,271 @@
+dArkOS A/B benchmark - mode: all
+kernel 4.4.189   Sun Aug 16 17:52:11 CEST 2026
+
+===============================================================
+1. Setup
+---------------------------------------------------------------
+
+-- timing primitive
+   chosen        : EPOCHREALTIME (bash builtin, us)
+   EPOCHREALTIME : 1786895531.853582
+   date +%s%N    : 1786895531858652648
+   /proc/uptime  : 192.05
+   6 back-to-back readings (ms): 1786895531867 1786895531867 1786895531867 1786895531867 1786895531868 1786895531868
+   sleep 1 measured as 1004 ms
+   -> this is a millisecond clock and it runs at the right rate
+
+-- scratch filesystem
+   MOUNT          DEVICE           FSTYPE    FUSE  COMPRESS  AVAIL MB
+   /roms          /dev/mmcblk0p3   exfat     no    no        46635
+   /home          /dev/mmcblk0p2   btrfs     no    yes       4892
+
+-- chosen
+   scratch directory : /roms
+   filesystem        : exfat on /dev/mmcblk0p3, fuse=no, compression=no
+   free space        : 46635 MB
+   queue             : /sys/class/block/mmcblk0/queue
+   restore script    : /tmp/darkos-bench-restore.3226 (deleted on a clean or interrupted exit)
+
+-- incompressible source buffer
+   location : /dev/shm/darkos-bench-seed.3226
+   8 MB from /dev/urandom took 2234 ms
+   -> that is about 3 MB/s: streaming it
+      directly would have measured the random pool, not the card
+
+-- state this system was in before the run
+   MemTotal              : 916912 kB
+   vm.dirty_ratio        : 0
+   vm.dirty_background_ratio : 0
+   vm.dirty_bytes        : 33554432
+   vm.dirty_background_bytes : 8388608
+   /etc/sysctl.d/60-darkos-writeback.conf: present
+   /etc/udev/rules.d/60-darkos-scheduler.rules: absent
+   /etc/udev/rules.d/60-darkos-readahead.rules: absent
+   / mount options       : /dev/mmcblk0p2 / btrfs rw,noatime,compress=lzo,ssd,noacl,space_cache,subvolid=5,subvol=/
+   page cache            : /proc/sys/vm/drop_caches accepted a 3 - every read
+                           arm below starts cold, and each one drops it again
+   device under test     : /dev/mmcblk0p3 -> /sys/class/block/mmcblk0/queue
+   scheduler found       : deadline   (menu: noop [deadline] cfq )
+   read_ahead_kb found   : 512
+   rotational            : 0
+   nr_requests           : 128
+
+   Each arm below sets its own values, so it does not matter whether
+   apply-to-installed.sh has been run; the values above are only recorded
+   so the report says which state it started from, and restored at the end.
+
+-- how much this will write to the card
+   writeback : 536 MB per arm x 2 arms = 1072 MB, deleted afterwards
+               (sized from MemTotal - the reasoning is printed in that section)
+   scheduler : 128 MB read file + 32 MB writer file, created once.
+               Then the writer rewrites its 32 MB continuously for the
+               length of 6 reads.  That part is time-bounded, not
+               size-bounded, so it cannot be predicted exactly - expect a few
+               hundred MB; the exact figure is reported at the end of the mode.
+   readahead : re-uses the file the scheduler mode created, writes nothing
+   predictable total : 1232 MB, plus the background writer above
+   All of it is deleted at the end.  Ctrl-C now if this is not a card you
+   want to spend that on.
+
+===============================================================
+2. writeback: vm.dirty_bytes vs vm.dirty_ratio (commit 05945cf)
+---------------------------------------------------------------
+
+-- sizing
+   MemTotal                    : 895 MB
+   vm.dirty_ratio used to size : 20 % (kernel default - this system is in dirty_bytes mode, so the ratio it would fall back to cannot be read)
+     -> ratio threshold        : <= 179 MB dirty before the kernel throttles
+     -> background threshold   : <= 89 MB before it starts flushing
+   treatment threshold         : 32 MB (dirty_bytes=33554432, from
+                                 scripts/60-darkos-writeback.conf)
+   this run writes             : 536 MB per arm, in 4 MB chunks, 2 arms
+     -> 2.9x the ratio threshold, 1072 MB written in total
+   the earlier 64 MB attempt was 35% of this threshold, which is why
+   it cannot have shown anything on a unit this size
+   per-chunk floor (same dd, no card involved): 11 ms - subtract this
+   from min/median before reading anything into them
+
+-- arm A - baseline: ratios, as the kernel ships them
+   in force now: dirty_ratio=20 dirty_background_ratio=10 dirty_bytes=0 dirty_background_bytes=0
+   chunk latency          n=134  min     28  med     43  p95    255  max    625  total   11748 ms
+   closing sync                : 231 ms
+   peak Dirty seen during it   : 48 MB
+
+-- arm B - treatment: dirty_bytes=32M / dirty_background_bytes=8M
+   in force now: dirty_ratio=0 dirty_background_ratio=0 dirty_bytes=33554432 dirty_background_bytes=8388608
+   chunk latency          n=134  min     26  med     72  p95    359  max    575  total   20558 ms
+   closing sync                : 350 ms
+   peak Dirty seen during it   : 8 MB
+
+-- side by side
+   arm                 med        p95        max       sync    peak MB
+   baseline             43        255        625        231         48
+   treatment            72        359        575        350          8
+
+  WHAT THIS DECIDES:
+    The claim is about the worst case, so max, p95 and the closing sync are
+    the numbers that count.  Total time is expected to be roughly equal:
+    the same bytes reach the same card either way.
+    peak Dirty is the check on the run itself.  If the baseline arm's peak
+    never got near 179 MB the workload never reached the threshold and
+    the comparison is void - that is exactly what went wrong with the 64 MB
+    measurement quoted in the PR.
+    Order effect: the baseline arm runs first, so any card slowdown over
+    the run counts AGAINST the treatment, never for it.
+
+===============================================================
+3. scheduler: deadline vs cfq with competing I/O (commit 114e557)
+---------------------------------------------------------------
+
+-- what this device offers
+   queue                : /sys/class/block/mmcblk0/queue
+   scheduler menu       : noop [deadline] cfq 
+   creating the 128 MB file to read...
+   creating the 32 MB file the background writer rewrites...
+
+-- load
+   foreground : cold sequential read of 128 MB, timed - this is the number
+   background : one writer rewriting 32 MB over and over, fdatasync each
+                pass, running for the whole of every foreground read
+   reps       : 3 per scheduler, arms interleaved so a card that slows
+                down over the run cannot favour either one
+   rep 1  cfq       read   4451 ms   background passes during it: 11
+   rep 1  deadline  read   5948 ms   background passes during it: 28
+   rep 2  cfq       read   3977 ms   background passes during it: 15
+   rep 2  deadline  read   5706 ms   background passes during it: 28
+   rep 3  cfq       read   3163 ms   background passes during it: 10
+   rep 3  deadline  read   5414 ms   background passes during it: 26
+
+-- result
+   cfq read               n=3    min   3163  med   3977  p95   4451  max   4451  total   11591 ms
+   deadline read          n=3    min   5414  med   5706  p95   5948  max   5948  total   17068 ms
+   median throughput: cfq 32 MB/s, deadline 22 MB/s
+   background writer did 161 passes, 5152 MB written by it in total
+
+  WHAT THIS DECIDES:
+    CFQ's cost is slice_idle: it holds the device idle for a few milliseconds
+    after each request in case that process asks again, which is a win on a
+    seeking disk and pure latency on flash.  It only shows up when a second
+    process wants the device, which is why the reads above run against a
+    writer and not on their own.
+    deadline faster than cfq by a clear margin supports 114e557.
+    Equal times mean CFQ costs nothing measurable here and the commit is a
+    change without a benefit - defensible on principle, but say so.
+
+===============================================================
+4. read-ahead: 512 KB vs 128 KB, sequential read (commit 4442105)
+---------------------------------------------------------------
+
+-- load
+   cold sequential read of 128 MB, no competing I/O, 3 reps per arm,
+   arms interleaved.  read_ahead_kb is set on /sys/class/block/mmcblk0/queue.
+   rep 1  128 KB    read   2174 ms  (58 MB/s)
+   rep 1  512 KB    read   2013 ms  (63 MB/s)
+   rep 2  128 KB    read   2080 ms  (61 MB/s)
+   rep 2  512 KB    read   1989 ms  (64 MB/s)
+   rep 3  128 KB    read   2065 ms  (61 MB/s)
+   rep 3  512 KB    read   2114 ms  (60 MB/s)
+
+-- result
+   128 KB read            n=3    min   2065  med   2080  p95   2174  max   2174  total    6319 ms
+   512 KB read            n=3    min   1989  med   2013  p95   2114  max   2114  total    6116 ms
+
+  WHAT THIS DECIDES:
+    The first unit to run this reported 100 MB in 1858 ms at 128 KB and
+    1689 ms at 512 KB, a 9% gain.  This is here so a second unit can confirm
+    or contradict that, not to re-derive it.
+    Note the sizes are not comparable across units or cards - only the ratio
+    between the two arms on the SAME unit is.
+
+===============================================================
+5. nice: can nice -n -19 succeed for ark at all (commit 8fe20cc)
+---------------------------------------------------------------
+
+-- 1. what the unit asks for
+   LimitNICE=0
+   LimitNICESoft=0
+   User=ark
+   PAMName=
+   FragmentPath=/etc/systemd/system/emulationstation.service
+   LimitNICE is reported in rlimit form: 40 means nice -20 is allowed,
+   0 or empty means no negative nice at all.  PAMName= empty is the point:
+   without it systemd never opens a PAM session, so pam_limits never runs.
+
+-- 2. what a running emulationstation actually got
+   pid 510 /proc/510/limits:
+     Max nice priority         0                    0                    
+   soft limit 0 means the lowest nice ES and its children may
+   ask for is 20
+
+-- 3. nice -n -19 as ark, through su, so pam_limits DOES run
+   result: rc=0  nice achieved: -19
+   raw: -19
+   this is NOT the path ES takes.  It is here to show limits.conf is
+   correct and does work - when something actually applies it.
+
+-- 4. the same attempt with the rlimit ES really has
+   result: rc=0  nice achieved: 0
+   raw: nice: cannot set niceness: Permission denied 0
+   ulimit -e 0 lowers RLIMIT_NICE to the value step 2 read off the real
+   ES process.  A process may always lower its own limit, so this needs
+   no setpriv and reproduces the ES environment exactly.  su is used for
+   the uid only - the limit it inherits from PAM is thrown away here.
+   GNU nice prints a diagnostic and runs the command anyway, so the exit
+   status is not the evidence - the nice value above is.
+
+-- 5. what is running right now, and at what priority
+   PID NI PRI USER COMMAND
+       510   0  19 ark      emulationstatio
+       746   0  19 ark      emulationstatio
+
+  WHAT THIS DECIDES:
+    NI = -19 on a running game means the mechanism works and 8fe20cc is
+    unnecessary.  NI = 0 on a running game means all 249 of those calls are
+    failing and 8fe20cc is the fix.
+    Step 3 succeeding while step 4 fails is the proof that the limits.conf
+    line is fine and it is the missing PAM session, not the line, that breaks it.
+
+===============================================================
+6. VERDICT
+---------------------------------------------------------------
+
+CLAIM 1 - 05945cf, vm.dirty_bytes=32M cuts the worst-case write stall
+  INCONCLUSIVE - the baseline arm peaked at 48 MB dirty against a
+  threshold of about 179 MB, so it never reached the throttling point
+  this change is about.  Re-run with a larger --size.
+
+CLAIM 2 - 114e557, deadline beats CFQ on RK3326 under competing I/O
+  foreground read, median of 3: cfq 3977 ms, deadline 5706 ms (-1729 ms, -30%)
+  competing writer: 5152 MB written during the run
+  NOT SUPPORTED - cfq is the faster one here.  Revert 114e557.
+
+SUPPORTING - 4442105, read_ahead_kb=512
+  128 KB 2080 ms, 512 KB 2013 ms, 3% apart
+  Neither confirms nor contradicts: within noise on this unit.
+
+SUPPORTING - 8fe20cc, LimitNICE=-20
+  as ark with PAM (su)          : nice came out as -19
+  as ark with the ES rlimit     : nice came out as 0
+  RLIMIT_NICE of the live ES    : 0
+  DEMONSTRATED: the limits.conf line works when PAM applies it and
+  does nothing when it does not.  Since emulationstation.service has
+  no PAMName=, the second case is the one running in production, and
+  8fe20cc is the fix for it.
+
+Nothing above was measured on RK3566.  None of it transfers: different
+kernel, different schedulers, 2-4 GB of RAM and therefore a completely
+different ratio threshold.
+
+===============================================================
+Done.  Restoring what was changed.
+
+-- state after restore - compare this with the state found at the top
+   vm.dirty_ratio            : 0
+   vm.dirty_background_ratio : 0
+   vm.dirty_bytes            : 33554432
+   vm.dirty_background_bytes : 8388608
+   (the two pairs are mutually exclusive: the kernel zeroes one when the
+    other is written, so exactly one pair should be non-zero here)
+   scheduler                 : deadline
+   read_ahead_kb             : 512
+===============================================================
