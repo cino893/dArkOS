@@ -238,10 +238,6 @@ if [[ "$UNIT" == "rgb20pro" ]]; then
   sudo chroot Arkbuild/ bash -c "echo low_power > /home/ark/.config/.PowerLEDSleep"
 fi
 
-# Cap dirty page writeback so a big write cannot stall the emulator for seconds.
-sudo mkdir -p Arkbuild/etc/sysctl.d
-sudo cp scripts/60-darkos-writeback.conf Arkbuild/etc/sysctl.d/60-darkos-writeback.conf
-
 # Speaker Toggle to set audio output to SPK on boot
 sudo mkdir -p Arkbuild/usr/local/bin
 sudo cp scripts/spktoggle.sh Arkbuild/usr/local/bin/
