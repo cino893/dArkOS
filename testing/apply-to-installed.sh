@@ -29,9 +29,9 @@
 # so undo can put the system back exactly as it was.  /etc/fstab is only touched
 # after the same option set has been proven to work with a live remount, and the
 # rewritten file is parsed back before it is trusted.  The per-device sysfs
-# values the two udev rules overwrite are snapshotted there as well, so undo can
-# write them back rather than leave an A/B measurement contaminated until the
-# next reboot.
+# values the read-ahead rule overwrites are snapshotted there as well, so undo
+# can write them back rather than leave an A/B measurement contaminated until
+# the next reboot.
 
 ###############################################################################
 # Constants
@@ -229,11 +229,9 @@ do_reloads() {
     if [ "${RELOAD_SYSCTL}" -eq 1 ]; then
         step "sysctl --system"
         if have sysctl; then
-            sysctl --system >/dev/null 2>&1 ||
-                sysctl -p /etc/sysctl.d/60-darkos-writeback.conf >/dev/null 2>&1 ||
-                bad "sysctl reload failed"
+            sysctl --system >/dev/null 2>&1 || bad "sysctl reload failed"
         else
-            bad "sysctl not found - the writeback caps apply at the next boot"
+            bad "sysctl not found - restored sysctl files apply at the next boot"
         fi
     fi
 }
@@ -295,9 +293,7 @@ scripts/zram-swap.service
 scripts/portmaster-hooks.sh
 scripts/portmaster-hooks.service
 scripts/portmaster-hooks.path
-scripts/60-darkos-scheduler.rules
 scripts/60-darkos-readahead.rules
-scripts/60-darkos-writeback.conf
 portmaster/mod_dArkOS.txt
 "
 
@@ -324,7 +320,7 @@ check_sources() {
 ###############################################################################
 
 apply_1_portmaster() {
-    step "1/7  PortMaster hook kept across updates + zram swap at boot (2ac3da2)"
+    step "1.  PortMaster hook kept across updates + zram swap at boot (2ac3da2)"
     ok=0
     mkdir -p /usr/local/share/dArkOS/portmaster /usr/local/bin 2>/dev/null
     for t in "${REPO}"/portmaster/*.txt; do
@@ -422,27 +418,8 @@ apply_1_portmaster() {
     fi
 }
 
-apply_2_scheduler() {
-    step "2/7  I/O scheduler deadline via udev, RK3326 only (da23fd9)"
-    if [ "${SOC}" != "rk3326" ]; then
-        info "platform is ${SOC} - skipped on purpose."
-        info "RK3566 already gets bfq from 10-standard.rules, and a 60- file"
-        info "sorts later and would override it (udev(7): rules files are sorted"
-        info "lexicographically regardless of the directory they live in)."
-        record "2 scheduler" SKIP "not RK3326 (detected: ${SOC})"
-        return
-    fi
-    backup_blk_attr scheduler
-    if install_file "${REPO}/scripts/60-darkos-scheduler.rules" /etc/udev/rules.d/60-darkos-scheduler.rules; then
-        RELOAD_UDEV=1
-        record "2 scheduler" PASS "rule installed"
-    else
-        record "2 scheduler" FAIL "install failed"
-    fi
-}
-
 apply_3_welcome() {
-    step "3/7  welcome-message.service no longer delays EmulationStation (45c43ae)"
+    step "3.  welcome-message.service no longer delays EmulationStation (45c43ae)"
     frag="$(systemctl show -p FragmentPath --value welcome-message.service 2>/dev/null)"
     if [ -z "${frag}" ] || [ ! -f "${frag}" ]; then
         info "welcome-message.service has no unit file on this system."
@@ -502,7 +479,7 @@ apply_3_welcome() {
 }
 
 apply_4_rootfs() {
-    step "4/7  root mount options: compress=${ROOT_COMPRESS}, drop ssd_spread (34b5670)"
+    step "4.  root mount options: compress=${ROOT_COMPRESS}, drop ssd_spread (34b5670)"
     if [ "${SOC}" != "rk3326" ]; then
         info "platform is ${SOC} - skipped.  The commit only changes"
         info "setup_partition.sh; RK3566 keeps compress=zstd:1, which its 5.10"
@@ -595,7 +572,7 @@ apply_4_rootfs() {
 }
 
 apply_5_nice() {
-    step "5/7  LimitNICE=-20 for EmulationStation (8ea33fd)"
+    step "5.  LimitNICE=-20 for EmulationStation (8ea33fd)"
     frag="$(systemctl show -p FragmentPath --value emulationstation.service 2>/dev/null)"
     if [ -z "${frag}" ] || [ ! -f "${frag}" ]; then
         info "emulationstation.service has no unit file on this system."
@@ -620,7 +597,7 @@ apply_5_nice() {
 }
 
 apply_6_readahead() {
-    step "6/7  read_ahead_kb 512 via udev, both platforms (53455a5)"
+    step "6.  read_ahead_kb 512 via udev, both platforms (53455a5)"
     backup_blk_attr read_ahead_kb
     if install_file "${REPO}/scripts/60-darkos-readahead.rules" /etc/udev/rules.d/60-darkos-readahead.rules; then
         RELOAD_UDEV=1
@@ -630,16 +607,8 @@ apply_6_readahead() {
     fi
 }
 
-apply_7_writeback() {
-    step "7/7  vm.dirty_bytes / vm.dirty_background_bytes (195b50d)"
-    if install_file "${REPO}/scripts/60-darkos-writeback.conf" /etc/sysctl.d/60-darkos-writeback.conf; then
-        RELOAD_SYSCTL=1
-        record "7 writeback caps" PASS "sysctl drop-in installed"
-    else
-        record "7 writeback caps" FAIL "install failed"
-    fi
-}
-
+# Changes 2 (deadline) and 7 (dirty_bytes) were reverted after darkos-bench.sh
+# measured them on an RG351MP, so there is nothing left here to install.
 do_apply() {
     say "Applying PR #38 to the running system."
     say "repository : ${REPO}"
@@ -647,12 +616,10 @@ do_apply() {
     say "backups    : ${BK}"
     backup_ready || { bad "cannot create ${BK}"; return 1; }
     apply_1_portmaster
-    apply_2_scheduler
     apply_3_welcome
     apply_4_rootfs
     apply_5_nice
     apply_6_readahead
-    apply_7_writeback
     do_reloads
     return 0
 }
@@ -801,7 +768,7 @@ do_undo() {
     if [ "${rb_partial}" -eq 1 ]; then
         needs_reboot "2/6 udev: some block device values could not be written back - those clear at the next reboot"
     elif [ "${touched_udev}" -eq 1 ] && [ "${rb_snapshot}" -eq 0 ]; then
-        needs_reboot "2/6 udev: no pre-apply snapshot in ${SYSFS_BK} to restore from - the applied scheduler and read-ahead values stay until reboot"
+        needs_reboot "udev: no pre-apply snapshot in ${SYSFS_BK} to restore from - the applied scheduler and read-ahead values stay until reboot"
     fi
 
     step "backup directory left in place at ${BK} - delete it by hand when done"
@@ -863,20 +830,10 @@ do_status() {
     st "1 portmaster+zram" "${s}" "files=${n}/3 zram-swap=${zen:-none} hooks.path=${pen:-none} hooks.service=${sen:-none}"
     st "" "" "swap: ${swap:-NONE}  /sys/block/zram0/disksize=${dsz:-n/a}"
 
-    # 2
-    if [ "${SOC}" != "rk3326" ]; then
-        st "2 scheduler" "N/A" "RK3326 only; this is ${SOC}"
-    else
-        r="$([ -f /etc/udev/rules.d/60-darkos-scheduler.rules ] && echo yes || echo no)"
-        cur="$(blk_attr_report scheduler)"
-        case "${cur}" in
-            *"[deadline]"*) s="APPLIED" ;;
-            "")             s="UNKNOWN" ;;
-            *)              s="ABSENT" ;;
-        esac
-        [ "${r}" = "no" ] && [ "${s}" = "APPLIED" ] && s="PARTIAL"
-        st "2 scheduler" "${s}" "rule=${r} live: ${cur:-none}"
-    fi
+    # 2 - reverted after measurement; reported for context only
+    st "2 scheduler" "REVERTED" "deadline lost to cfq under a competing writer on an"
+    st "" "" "RG351MP - see testing/rk3326-rg351mp-bench-all.txt"
+    st "" "" "live: $(blk_attr_report scheduler)"
 
     # 3
     b="$(systemctl show -p Before --value welcome-message.service 2>/dev/null)"
@@ -937,12 +894,10 @@ do_status() {
     # 7
     db="$(cat /proc/sys/vm/dirty_bytes 2>/dev/null)"
     bg="$(cat /proc/sys/vm/dirty_background_bytes 2>/dev/null)"
-    f="$([ -f /etc/sysctl.d/60-darkos-writeback.conf ] && echo yes || echo no)"
-    if [ "${db}" = "33554432" ] && [ "${bg}" = "8388608" ]; then s="APPLIED"
-    elif [ "${db}" = "0" ] || [ -z "${db}" ]; then s="ABSENT"
-    else s="PARTIAL"; fi
-    [ "${f}" = "no" ] && [ "${s}" = "APPLIED" ] && s="PARTIAL"
-    st "7 writeback caps" "${s}" "file=${f} dirty_bytes=${db:-?} dirty_background_bytes=${bg:-?}"
+    # 7 - reverted after measurement; reported for context only
+    st "7 writeback caps" "REVERTED" "the cap cost 46->26 MB/s and the throttling point it"
+    st "" "" "targets was never reached on an RG351MP - same log"
+    st "" "" "live: dirty_bytes=${db:-?} dirty_background_bytes=${bg:-?}"
 
     say ""
     if [ -f "${MANIFEST}" ]; then
