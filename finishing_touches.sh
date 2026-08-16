@@ -67,12 +67,6 @@ sudo mkdir -p Arkbuild/usr/lib/systemd/system-sleep
 sudo cp scripts/sleep.${CHIPSET} Arkbuild/usr/lib/systemd/system-sleep/sleep
 sudo chmod 777 Arkbuild/usr/lib/systemd/system-sleep/sleep
 
-# Pick deadline over the compiled-in CFQ default for SD/eMMC.  Standalone rules
-# file, not a line in the 10-standard.rules heredoc, so it can also be dropped
-# onto an already installed system.  RK3326 only - see the file header.
-sudo mkdir -p Arkbuild/etc/udev/rules.d
-sudo cp scripts/60-darkos-scheduler.rules Arkbuild/etc/udev/rules.d/60-darkos-scheduler.rules
-
 # Set performance governor to ondemand on boot
 sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/perfnorm quiet &\") | crontab -"
 
